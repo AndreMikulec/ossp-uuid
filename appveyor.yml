@@ -1,0 +1,105 @@
+
+## Permission to use, copy, modify, and distribute this software for
+## any purpose with or without fee is hereby granted, provided that
+## the above copyright notice and this permission notice appear in all
+## copies.
+## 
+## THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
+## WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+## MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+## IN NO EVENT SHALL THE AUTHORS AND COPYRIGHT HOLDERS AND THEIR
+## CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+## SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+## LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+## USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+## ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+## OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+## OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+## SUCH DAMAGE.
+## 
+## HOME AND DOCUMENTATION
+## 
+## The documentation and latest release can be found on
+## 
+## http://www.ossp.org/pkg/lib/uuid/
+## ftp://ftp.ossp.org/pkg/lib/uuid/
+
+# collect IP and username for rdp
+init:
+  - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+    
+version: 0.1.0-{build}-{branch}
+
+# branches to build
+branches:
+  # whitelist
+  only:
+    - master
+
+# tag triggers a build ( no! - I do not care about tags )
+# 
+# https://www.appveyor.com/docs/deployment/
+# https://www.appveyor.com/docs/appveyor-yml/
+skip_tags: true
+
+platform:
+  - x64
+    
+configuration:
+  - Release
+
+install:
+  - echo on
+  - echo %cd%
+  - set 
+  - appveyor downloadfile https://sourceforge.net/projects/mingw/files/MinGW/Extension/pexports/pexports-0.47/pexports-0.47-mingw32-bin.tar.xz 
+  - 7z e pexports-0.47-mingw32-bin.tar.xz
+  # to somewhere that MinGW can find it
+  - echo %APPVEYOR_BUILD_FOLDER%
+  - mkdir temp
+  - cd    temp
+  - 7z e  ..\pexports-0.47-mingw32-bin.tar -o. pexports.exe -r
+  - copy pexports.exe .. 
+  - cd                .. 
+    
+build_script:
+  - echo on
+  - echo %cd%
+  - set 
+  # MinGW-w64 MSYS root directory: C:\MinGW\msys\1.0
+  - set PATH=C:\MinGW\msys\1.0\bin;%PATH%
+  # need exact path
+  - C:\MinGW\msys\1.0\bin\sh.exe --login '%APPVEYOR_BUILD_FOLDER%\appveyor.sh'
+  - '"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x64'
+  - cd %APPVEYOR_BUILD_FOLDER%
+  - echo %cd%
+  - cd dist\x64\bin
+  - lib /def:ossp-uuid.def /out:..\lib\ossp-uuid.lib
+  - cd ../../..
+  - '"C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x86'
+  - cd %APPVEYOR_BUILD_FOLDER%
+  - echo %cd%
+  - cd dist\i686\bin
+  - lib /def:ossp-uuid.def /out:..\lib\ossp-uuid.lib
+  - cd ../../..
+
+deploy:
+  release: $(APPVEYOR_PROJECT_SLUG)-$(appveyor_build_version)
+  provider: GitHub
+  auth_token:
+    secure: KzS1DumC2yBg2LGN9x3AemHFOjAdp+rD58rW5aGGpwW4Pfdwdm7AmRpYKprPY8Gs
+  artifact: $(APPVEYOR_PROJECT_SLUG)_Dist_x64_i686
+  draft: false
+  prerelease: false
+  on:
+    branch: master
+    # I do not care about tags
+    appveyor_repo_tag: false
+
+artifacts:
+  - path: dist
+    name: $(APPVEYOR_PROJECT_SLUG)_Dist_x64_i686
+
+# on_finish:
+#   - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+# # remove locking file from the desktop
